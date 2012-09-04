@@ -14,6 +14,6 @@
 atlassian-ide-plugin.xml
 
 # Project
-/{{ project_name }}/local_settings.py
-/{{ project_name }}/public/static
-/{{ project_name }}/public/media
+/missioncontrol/local_settings.py
+/missioncontrol/public/static
+/missioncontrol/public/media
