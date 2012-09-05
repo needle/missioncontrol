@@ -4,5 +4,7 @@ python:
   - "2.7"
 install:
   - pip install -q --use-mirrors -r requirements.txt
+before_script:
+  - cp missioncontrol/__local_settings.py missioncontrol/local_settings.py
 script:
   - python manage.py test missioncontrol
