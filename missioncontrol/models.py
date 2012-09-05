@@ -1,6 +1,8 @@
 from django.db import models
 import operator
 import simplejson
+from missioncontrol import settings
+from missioncontrol import plugins
 
 
 class GraphiteServer(models.Model):
@@ -40,7 +42,7 @@ class MetricAlert(models.Model):
     server = models.ForeignKey('GraphiteServer', related_name='metric_alerts')
 
     def do_alert(self, alert):
-        return alert
+        plugin_registry.notify_plugins(alert)
 
     def check(self, json):
         if isinstance(json, basestring):
@@ -68,3 +70,6 @@ class MetricAlert(models.Model):
                 if _operator(single, self.threshold):
                     return self.do_alert("%s is %s than %i (%i)" %
                         (target['target'], self.operator, self.threshold, single))
+
+
+plugin_registry = plugins.init()

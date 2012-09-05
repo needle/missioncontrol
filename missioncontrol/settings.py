@@ -162,6 +162,7 @@ CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
 import djcelery
 djcelery.setup_loader()
 
+
 try:
     LOCAL_SETTINGS
 except NameError:
