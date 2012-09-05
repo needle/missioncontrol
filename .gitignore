@@ -15,6 +15,4 @@
 atlassian-ide-plugin.xml
 
 # Project
-/missioncontrol/local_settings.py
-/missioncontrol/public/static
-/missioncontrol/public/media
+missioncontrol/local_settings.py
