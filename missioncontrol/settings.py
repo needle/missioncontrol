@@ -122,6 +122,9 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
+    'kombu.transport.django',
+    'djcelery',
+    'missioncontrol'
 )
 
 # A sample logging configuration. The only tangible logging
@@ -152,6 +155,12 @@ LOGGING = {
         },
     }
 }
+
+BROKER_URL = 'django://'
+CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
+
+import djcelery
+djcelery.setup_loader()
 
 try:
     LOCAL_SETTINGS
