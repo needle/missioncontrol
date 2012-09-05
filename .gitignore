@@ -4,6 +4,7 @@
 # Python
 *.pyc
 *.pyo
+*.db
 
 # Common IDEs
 *.swp
