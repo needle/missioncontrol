@@ -1,4 +1,5 @@
 from missioncontrol import settings
+from collections import defaultdict
 
 
 class PluginRegistry(object):
@@ -13,9 +14,29 @@ class PluginRegistry(object):
         self._plugins = [self._do_import(plugin)
             for plugin in getattr(settings, "NOTIFICATION_PLUGINS", [])]
 
-    def notify_plugins(self, message):
+        self._alert_status = defaultdict(lambda: defaultdict(int))
+
+    def _decide_to_notify(self, plugin, instance, target):
+        notify = False
+        if target not in self._alert_status:
+            notify = True
+        elif target in self._alert_status and self._alert_status[target][plugin] % instance.notify_every == 0:
+            notify = True
+        return notify
+
+    def notify_plugins(self, message, alert_type="alert", instance=None, **kwargs):
+        target = kwargs.get('target')
         for plugin in self._plugins:
-            plugin.send_alert(message)
+            if alert_type == "alert":
+                if self._decide_to_notify(plugin, instance, target):
+                    plugin.send_alert("%s (failed %i times)" % (message,
+                        self._alert_status[target][plugin]),
+                        alert_type=alert_type, **kwargs)
+                self._alert_status[target][plugin] += 1
+            elif alert_type == "recovery":
+                if target in self._alert_status and plugin in self._alert_status[target]:
+                    plugin.send_alert(message, alert_type=alert_type, **kwargs)
+                    del self._alert_status[target][plugin]
 
 
 def init():

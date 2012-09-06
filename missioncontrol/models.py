@@ -3,6 +3,7 @@ import operator
 import simplejson
 from missioncontrol import settings
 from missioncontrol import plugins
+from collections import defaultdict
 
 
 class GraphiteServer(models.Model):
@@ -40,36 +41,36 @@ class MetricAlert(models.Model):
     kind = models.CharField(choices=KIND_CHOICES, max_length=16,
         help_text='Average is the average of all data points returned, total is the total')
     server = models.ForeignKey('GraphiteServer', related_name='metric_alerts')
+    notify_every = models.IntegerField(help_text="Number of checks to notify after", default=30)
 
-    def do_alert(self, alert):
-        plugin_registry.notify_plugins(alert)
+    def do_alert(self, alert_type="alert", value=0, target=None, **kwargs):
+        if alert_type == "alert":
+            message = "%s is %s %i (actual: %i)" % (
+                target, self.operator, self.threshold, value)
+        elif alert_type == "recovery":
+            message = "%s is within normal again" % target
+        plugin_registry.notify_plugins(message, instance=self,
+            alert_type=alert_type, target=target, **kwargs)
 
     def check(self, json):
-        if isinstance(json, basestring):
-            json = simplejson.loads(json)
         _operator = getattr(operator, self.operator, operator.eq)
         for target in json:
-            total = 0
-            single = 0
+            values = defaultdict(int)
             datapoints = [x[0] for x in target['datapoints'] if x[0] is not None]
             for value in datapoints:
-                total += value
-                if value > single:
-                    single = value
-            average = total / len(datapoints)
+                values['total'] += value
+                if _operator(value, values['single']):
+                    values['single'] = value
+            values['average'] = values['total'] / len(datapoints)
 
-            if self.kind == 'avg':
-                if _operator(average, self.threshold):
-                    return self.do_alert("%s is %s than %i (%i)" %
-                        (target['target'], self.operator, self.threshold, average))
-            elif self.kind == 'total':
-                if _operator(total, self.threshold):
-                    return self.do_alert("%s is %s than %i (%i)" %
-                        (target['target'], self.operator, self.threshold, total))
-            elif self.kind == 'single':
-                if _operator(single, self.threshold):
-                    return self.do_alert("%s is %s than %i (%i)" %
-                        (target['target'], self.operator, self.threshold, single))
+            if _operator(values[self.kind], self.threshold):
+                self.do_alert(alert_type="alert",
+                    value=values[self.kind],
+                    target=target['target'])
+            else:
+                self.do_alert(alert_type="recovery",
+                    value=values[self.kind],
+                    target=target['target'])
 
 
 plugin_registry = plugins.init()

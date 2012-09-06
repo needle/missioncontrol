@@ -22,7 +22,15 @@ class HipChatPlugin(BasePlugin):
         return requests.post('%s/rooms/message?auth_token=%s&format=json' %
             (HIPCHAT_API_URL, self.token),
             params=params
-         )
+        )
 
     def send_alert(self, alert, *args, **kwargs):
+        alert_type = kwargs.get('alert_type', 'alert')
+        if alert_type == "alert":
+            kwargs['notify'] = 1
+            kwargs['color'] = "red"
+        elif alert_type == "recovery":
+            kwargs['notify'] = 0
+            kwargs['color'] = "green"
+
         return self._send_hipchat_message(alert, **kwargs)

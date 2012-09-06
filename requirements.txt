@@ -3,3 +3,4 @@ django-celery>=3.0.6
 pencil==0.7
 requests==0.14.0
 simplejson==2.6.1
+mock==1.0b1
