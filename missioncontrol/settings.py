@@ -162,6 +162,8 @@ CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
 import djcelery
 djcelery.setup_loader()
 
+POLL_INTERVAL = 30
+
 
 try:
     LOCAL_SETTINGS

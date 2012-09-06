@@ -1,10 +1,11 @@
-from celery import task
+from celery.decorators import periodic_task
 from pencil import Pencil
 import requests
-import simplejson
+from missioncontrol import settings
+from datetime import timedelta
 
 
-@task()
+@periodic_task(run_every=timedelta(seconds=settings.POLL_INTERVAL))
 def check_graphite_servers():
     from missioncontrol.models import GraphiteServer
     for server in GraphiteServer.objects.all():
@@ -15,5 +16,4 @@ def check_graphite_servers():
             metric_resp = requests.get(metric_url,
                 auth=(server.username, server.password))
 
-            metric_json = simplejson.loads(metric_resp.text)
-            metricalert.check(metric_json)
+            metricalert.check(metric_resp.json)

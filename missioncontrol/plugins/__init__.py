@@ -26,6 +26,7 @@ class PluginRegistry(object):
 
     def notify_plugins(self, message, alert_type="alert", instance=None, **kwargs):
         target = kwargs.get('target')
+        instance.update_or_create_threshold_violation(target, alert_type)
         for plugin in self._plugins:
             if alert_type == "alert":
                 if self._decide_to_notify(plugin, instance, target):

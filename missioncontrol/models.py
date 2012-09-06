@@ -1,9 +1,11 @@
 from django.db import models
 import operator
-import simplejson
-from missioncontrol import settings
-from missioncontrol import plugins
 from collections import defaultdict
+from pencil import Pencil
+import datetime
+from missioncontrol import plugins
+
+plugin_registry = plugins.init()
 
 
 class GraphiteServer(models.Model):
@@ -14,6 +16,32 @@ class GraphiteServer(models.Model):
 
     def __unicode__(self):
         return self.name
+
+
+class ThresholdViolation(models.Model):
+
+    STATUS_CHOICES = (
+        ('resolved', 'Resolved'),
+        ('ongoing', 'Ongoing'),
+    )
+
+    target = models.CharField(max_length=256)
+    metricalert = models.ForeignKey('MetricAlert')
+    first_violation = models.DateTimeField(blank=True, auto_now_add=True)
+    last_violation = models.DateTimeField(blank=True, auto_now_add=True)
+    current_status = models.CharField(choices=STATUS_CHOICES, max_length=64)
+    threshold_violated = models.IntegerField()
+
+    @property
+    def graph_url(self):
+        at = "%H:%M_%Y%m%d"
+        graph_url = Pencil(begin=self.first_violation.strftime(at),
+            until=self.last_violation.strftime(at))
+        graph_url.add_metric(self.metricalert.target)
+        graph_url.add_metric("threshold(%i)" % self.threshold_violated,
+            alias="Threshold", colors="blue,red")
+
+        return graph_url.url(self.metricalert.server.base_url, 586, 306)
 
 
 class MetricAlert(models.Model):
@@ -43,10 +71,32 @@ class MetricAlert(models.Model):
     server = models.ForeignKey('GraphiteServer', related_name='metric_alerts')
     notify_every = models.IntegerField(help_text="Number of checks to notify after", default=30)
 
-    def do_alert(self, alert_type="alert", value=0, target=None, **kwargs):
+    def update_or_create_threshold_violation(self, target, alert_type):
+        # TODO: Separate this out into different functions
         if alert_type == "alert":
-            message = "%s is %s %i (actual: %i)" % (
-                target, self.operator, self.threshold, value)
+            viol, created = ThresholdViolation.objects.get_or_create(
+                target=target,
+                metricalert=self,
+                current_status="ongoing",
+                threshold_violated=self.threshold
+            )
+            viol.last_violation = datetime.datetime.now()
+            viol.save()
+        elif alert_type == "recovery":
+            try:
+                viol = ThresholdViolation.objects.get(
+                    target=target,
+                    metricalert=self,
+                    current_status="ongoing")
+                viol.current_status = "resolved"
+                viol.save()
+            except ThresholdViolation.DoesNotExist:
+                pass
+
+    def _do_alert(self, alert_type="alert", value=0, target=None, **kwargs):
+        if alert_type == "alert":
+            message = "%s %s is %s %i (actual: %i)" % (
+                target, self.kind, self.operator, self.threshold, value)
         elif alert_type == "recovery":
             message = "%s is within normal again" % target
         plugin_registry.notify_plugins(message, instance=self,
@@ -64,13 +114,10 @@ class MetricAlert(models.Model):
             values['average'] = values['total'] / len(datapoints)
 
             if _operator(values[self.kind], self.threshold):
-                self.do_alert(alert_type="alert",
+                self._do_alert(alert_type="alert",
                     value=values[self.kind],
                     target=target['target'])
             else:
-                self.do_alert(alert_type="recovery",
+                self._do_alert(alert_type="recovery",
                     value=values[self.kind],
                     target=target['target'])
-
-
-plugin_registry = plugins.init()
